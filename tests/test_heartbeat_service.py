@@ -287,3 +287,206 @@ async def test_decide_prompt_includes_current_time(tmp_path) -> None:
     assert user_msg["role"] == "user"
     assert "Current Time:" in user_msg["content"]
 
+
+@pytest.mark.asyncio
+async def test_triage_complexity_returns_simple(tmp_path) -> None:
+    """_triage_complexity returns 'simple' when LLM calls classify_task with simple."""
+    provider = DummyProvider([
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCallRequest(
+                    id="triage_1",
+                    name="classify_task",
+                    arguments={"complexity": "simple"},
+                )
+            ],
+        )
+    ])
+    service = HeartbeatService(
+        workspace=tmp_path,
+        provider=provider,
+        model="test-model",
+    )
+    result = await service._triage_complexity("fix typo in README")
+    assert result == "simple"
+
+
+@pytest.mark.asyncio
+async def test_triage_complexity_returns_complex(tmp_path) -> None:
+    """_triage_complexity returns 'complex' when LLM calls classify_task with complex."""
+    provider = DummyProvider([
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCallRequest(
+                    id="triage_2",
+                    name="classify_task",
+                    arguments={"complexity": "complex"},
+                )
+            ],
+        )
+    ])
+    service = HeartbeatService(
+        workspace=tmp_path,
+        provider=provider,
+        model="test-model",
+    )
+    result = await service._triage_complexity("Design a new microservices architecture")
+    assert result == "complex"
+
+
+@pytest.mark.asyncio
+async def test_triage_complexity_defaults_to_complex_on_no_tool_call(tmp_path) -> None:
+    """_triage_complexity falls back to 'complex' when LLM makes no tool call."""
+    provider = DummyProvider([LLMResponse(content="unclear", tool_calls=[])])
+    service = HeartbeatService(
+        workspace=tmp_path,
+        provider=provider,
+        model="test-model",
+    )
+    result = await service._triage_complexity("some task")
+    assert result == "complex"
+
+
+@pytest.mark.asyncio
+async def test_tick_sets_simple_model_override(tmp_path, monkeypatch) -> None:
+    """_tick sets _selected_model_override to triage_model for a simple task."""
+    (tmp_path / "HEARTBEAT.md").write_text("- [ ] fix typo", encoding="utf-8")
+
+    decide_response = LLMResponse(
+        content="",
+        tool_calls=[
+            ToolCallRequest(
+                id="hb_1",
+                name="heartbeat",
+                arguments={"action": "run", "tasks": "fix typo"},
+            )
+        ],
+    )
+    triage_response = LLMResponse(
+        content="",
+        tool_calls=[
+            ToolCallRequest(
+                id="t_1",
+                name="classify_task",
+                arguments={"complexity": "simple"},
+            )
+        ],
+    )
+    provider = DummyProvider([decide_response, triage_response])
+
+    observed_overrides: list[str | None] = []
+
+    async def _on_execute(tasks: str) -> str:
+        observed_overrides.append(service._selected_model_override)
+        return "done"
+
+    async def _eval_notify(*a, **kw):
+        return False
+
+    monkeypatch.setattr("nanobot.utils.evaluator.evaluate_response", _eval_notify)
+
+    service = HeartbeatService(
+        workspace=tmp_path,
+        provider=provider,
+        model="gemini/gemini-3-pro",
+        on_execute=_on_execute,
+        triage_model="ollama_chat/rnj-1",
+        planning_model="gemini/gemini-3-pro",
+    )
+
+    await service._tick()
+    assert observed_overrides == ["ollama_chat/rnj-1"]
+
+
+@pytest.mark.asyncio
+async def test_tick_sets_complex_model_override(tmp_path, monkeypatch) -> None:
+    """_tick sets _selected_model_override to planning_model for a complex task."""
+    (tmp_path / "HEARTBEAT.md").write_text("- [ ] design system", encoding="utf-8")
+
+    decide_response = LLMResponse(
+        content="",
+        tool_calls=[
+            ToolCallRequest(
+                id="hb_1",
+                name="heartbeat",
+                arguments={"action": "run", "tasks": "design system"},
+            )
+        ],
+    )
+    triage_response = LLMResponse(
+        content="",
+        tool_calls=[
+            ToolCallRequest(
+                id="t_1",
+                name="classify_task",
+                arguments={"complexity": "complex"},
+            )
+        ],
+    )
+    provider = DummyProvider([decide_response, triage_response])
+
+    observed_overrides: list[str | None] = []
+
+    async def _on_execute(tasks: str) -> str:
+        observed_overrides.append(service._selected_model_override)
+        return "done"
+
+    async def _eval_notify(*a, **kw):
+        return False
+
+    monkeypatch.setattr("nanobot.utils.evaluator.evaluate_response", _eval_notify)
+
+    service = HeartbeatService(
+        workspace=tmp_path,
+        provider=provider,
+        model="gemini/gemini-3-pro",
+        on_execute=_on_execute,
+        triage_model="ollama_chat/rnj-1",
+        planning_model="gemini/gemini-3-pro",
+    )
+
+    await service._tick()
+    assert observed_overrides == ["gemini/gemini-3-pro"]
+
+
+@pytest.mark.asyncio
+async def test_tick_no_override_without_triage_config(tmp_path, monkeypatch) -> None:
+    """When triage_model/planning_model not set, _selected_model_override stays None."""
+    (tmp_path / "HEARTBEAT.md").write_text("- [ ] some task", encoding="utf-8")
+
+    provider = DummyProvider([
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCallRequest(
+                    id="hb_1",
+                    name="heartbeat",
+                    arguments={"action": "run", "tasks": "some task"},
+                )
+            ],
+        ),
+    ])
+
+    observed_overrides: list[str | None] = []
+
+    async def _on_execute(tasks: str) -> str:
+        observed_overrides.append(service._selected_model_override)
+        return "done"
+
+    async def _eval_notify(*a, **kw):
+        return False
+
+    monkeypatch.setattr("nanobot.utils.evaluator.evaluate_response", _eval_notify)
+
+    service = HeartbeatService(
+        workspace=tmp_path,
+        provider=provider,
+        model="gemini/gemini-3-pro",
+        on_execute=_on_execute,
+    )
+
+    await service._tick()
+    assert observed_overrides == [None]
+

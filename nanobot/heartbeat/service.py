@@ -11,6 +11,30 @@ from loguru import logger
 if TYPE_CHECKING:
     from nanobot.providers.base import LLMProvider
 
+_TRIAGE_TOOL = [
+    {
+        "type": "function",
+        "function": {
+            "name": "classify_task",
+            "description": "Classify the complexity of the pending tasks.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "complexity": {
+                        "type": "string",
+                        "enum": ["simple", "complex"],
+                        "description": (
+                            "simple = short, self-contained task a lightweight local model can handle; "
+                            "complex = multi-step planning, coding, or research requiring a capable model"
+                        ),
+                    },
+                },
+                "required": ["complexity"],
+            },
+        },
+    }
+]
+
 _HEARTBEAT_TOOL = [
     {
         "type": "function",
@@ -59,6 +83,8 @@ class HeartbeatService:
         on_notify: Callable[[str], Coroutine[Any, Any, None]] | None = None,
         interval_s: int = 30 * 60,
         enabled: bool = True,
+        triage_model: str | None = None,
+        planning_model: str | None = None,
     ):
         self.workspace = workspace
         self.provider = provider
@@ -67,8 +93,12 @@ class HeartbeatService:
         self.on_notify = on_notify
         self.interval_s = interval_s
         self.enabled = enabled
+        self.triage_model = triage_model
+        self.planning_model = planning_model
         self._running = False
         self._task: asyncio.Task | None = None
+        # Populated during _tick() so on_execute closures can read the chosen model.
+        self._selected_model_override: str | None = None
 
     @property
     def heartbeat_file(self) -> Path:
@@ -107,6 +137,32 @@ class HeartbeatService:
 
         args = response.tool_calls[0].arguments
         return args.get("action", "skip"), args.get("tasks", "")
+
+    async def _triage_complexity(self, tasks: str) -> str:
+        """Classify task complexity via a virtual tool call.
+
+        Returns 'simple' or 'complex'.  Falls back to 'complex' when the LLM
+        does not call the tool (safe default keeps the capable model).
+        """
+        response = await self.provider.chat_with_retry(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a task classifier. "
+                        "Call classify_task to indicate whether the pending tasks are "
+                        "simple (a lightweight local model can handle them) or "
+                        "complex (they require a capable planning model)."
+                    ),
+                },
+                {"role": "user", "content": tasks},
+            ],
+            tools=_TRIAGE_TOOL,
+            model=self.model,
+        )
+        if response.has_tool_calls:
+            return response.tool_calls[0].arguments.get("complexity", "complex")
+        return "complex"
 
     async def start(self) -> None:
         """Start the heartbeat service."""
@@ -151,12 +207,24 @@ class HeartbeatService:
 
         logger.info("Heartbeat: checking for tasks...")
 
+        self._selected_model_override = None
+
         try:
             action, tasks = await self._decide(content)
 
             if action != "run":
                 logger.info("Heartbeat: OK (nothing to report)")
                 return
+
+            # Triage: route task to the appropriate model when configured.
+            if self.triage_model and self.planning_model:
+                complexity = await self._triage_complexity(tasks)
+                if complexity == "simple":
+                    self._selected_model_override = self.triage_model
+                    logger.info("Heartbeat: simple task → {}", self.triage_model)
+                else:
+                    self._selected_model_override = self.planning_model
+                    logger.info("Heartbeat: complex task → {}", self.planning_model)
 
             logger.info("Heartbeat: tasks found, executing...")
             if self.on_execute:
