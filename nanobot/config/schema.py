@@ -95,6 +95,8 @@ class HeartbeatConfig(Base):
 
     enabled: bool = True
     interval_s: int = 30 * 60  # 30 minutes
+    triage_model: str | None = None  # lightweight local model for simple tasks (e.g. Ollama)
+    planning_model: str | None = None  # capable model for complex tasks (e.g. Gemini)
 
 
 class GatewayConfig(Base):

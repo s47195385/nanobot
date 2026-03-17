@@ -580,13 +580,21 @@ def gateway(
         async def _silent(*_args, **_kwargs):
             pass
 
-        return await agent.process_direct(
-            tasks,
-            session_key="heartbeat",
-            channel=channel,
-            chat_id=chat_id,
-            on_progress=_silent,
-        )
+        # Apply model override selected by triage (if configured).
+        orig_model = agent.model
+        model_override = heartbeat._selected_model_override
+        if model_override:
+            agent.model = model_override
+        try:
+            return await agent.process_direct(
+                tasks,
+                session_key="heartbeat",
+                channel=channel,
+                chat_id=chat_id,
+                on_progress=_silent,
+            )
+        finally:
+            agent.model = orig_model
 
     async def on_heartbeat_notify(response: str) -> None:
         """Deliver a heartbeat response to the user's channel."""
@@ -605,6 +613,8 @@ def gateway(
         on_notify=on_heartbeat_notify,
         interval_s=hb_cfg.interval_s,
         enabled=hb_cfg.enabled,
+        triage_model=hb_cfg.triage_model,
+        planning_model=hb_cfg.planning_model,
     )
 
     if channels.enabled_channels:
