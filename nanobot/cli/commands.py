@@ -383,6 +383,15 @@ def _make_provider(config: Config):
             default_model=model,
             extra_headers=p.extra_headers if p else None,
         )
+    # copilot-api proxy: direct OpenAI-compatible endpoint, no LiteLLM
+    elif provider_name == "copilot_api":
+        from nanobot.providers.custom_provider import CustomProvider
+        provider = CustomProvider(
+            api_key=p.api_key if (p and p.api_key) else "no-key",
+            api_base=config.get_api_base(model) or "http://127.0.0.1:4141/v1",
+            default_model=model,
+            extra_headers=p.extra_headers if p else None,
+        )
     # Azure OpenAI: direct Azure OpenAI endpoint with deployment name
     elif provider_name == "azure_openai":
         if not p or not p.api_key or not p.api_base:

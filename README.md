@@ -780,6 +780,7 @@ Config file: `~/.nanobot/config.json`
 | Provider | Purpose | Get API Key |
 |----------|---------|-------------|
 | `custom` | Any OpenAI-compatible endpoint (direct, no LiteLLM) | — |
+| `copilot_api` | copilot-api proxy endpoint (OpenAI-compatible, non-Docker via npx) | [ericc-ch/copilot-api](https://github.com/ericc-ch/copilot-api) |
 | `openrouter` | LLM (recommended, access to all models) | [openrouter.ai](https://openrouter.ai) |
 | `volcengine` | LLM (VolcEngine, pay-per-use) | [Coding Plan](https://www.volcengine.com/activity/codingplan?utm_campaign=nanobot&utm_content=nanobot&utm_medium=devrel&utm_source=OWO&utm_term=nanobot) · [volcengine.com](https://www.volcengine.com) |
 | `byteplus` | LLM (VolcEngine international, pay-per-use) | [Coding Plan](https://www.byteplus.com/en/activity/codingplan?utm_campaign=nanobot&utm_content=nanobot&utm_medium=devrel&utm_source=OWO&utm_term=nanobot) · [byteplus.com](https://www.byteplus.com) |
@@ -833,6 +834,40 @@ nanobot agent -c ~/.nanobot-telegram/config.json -w /tmp/nanobot-telegram-test -
 ```
 
 > Docker users: use `docker run -it` for interactive OAuth login.
+
+</details>
+
+<details>
+<summary><b>Copilot API Proxy (npx, no Docker)</b></summary>
+
+Use [copilot-api](https://github.com/ericc-ch/copilot-api) as a lightweight local OpenAI-compatible endpoint for nanobot.
+
+This avoids container overhead by using `npx` directly and keeps login persistent via a local data directory.
+
+**1. One-time setup (auth + config):**
+```bash
+scripts/setup-copilot-api-npx.sh
+```
+
+**2. Start copilot-api + nanobot together:**
+```bash
+# starts copilot-api on :4141, then nanobot gateway
+scripts/startup-copilot-api-nanobot.sh gateway
+
+# or run a one-off command
+scripts/startup-copilot-api-nanobot.sh agent -m "hello"
+```
+
+**3. Optional environment overrides:**
+```bash
+export COPILOT_API_PORT=4141
+export COPILOT_API_DATA_HOME="$HOME/.nanobot/copilot-api-data"
+export NANOBOT_COPILOT_MODEL="gpt-4.1"
+```
+
+`scripts/setup-copilot-api-npx.sh` writes:
+- `agents.defaults.provider = "copilot_api"`
+- `providers.copilotApi.apiBase = "http://127.0.0.1:4141/v1"`
 
 </details>
 
@@ -1322,6 +1357,8 @@ The agent can also manage this file itself — ask it to "add a periodic task" a
 
 > [!TIP]
 > The `-v ~/.nanobot:/root/.nanobot` flag mounts your local config directory into the container, so your config and workspace persist across container restarts.
+>
+> If you want lower RAM/CPU overhead than Docker for local usage, use the non-Docker `npx` flow in **Copilot API Proxy (npx, no Docker)** above.
 
 ### Docker Compose
 

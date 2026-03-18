@@ -80,6 +80,16 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         litellm_prefix="",
         is_direct=True,
     ),
+    ProviderSpec(
+        name="copilot_api",
+        keywords=("copilot_api", "copilot-api"),
+        env_key="",
+        display_name="Copilot API",
+        litellm_prefix="",
+        default_api_base="http://127.0.0.1:4141/v1",
+        is_local=True,
+        is_direct=True,
+    ),
 
     # === Azure OpenAI (direct API calls with API version 2024-10-21) =====
     ProviderSpec(
