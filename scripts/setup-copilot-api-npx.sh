@@ -20,13 +20,15 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
 fi
 
 COPILOT_STATE_DIR="$XDG_DATA_HOME/copilot-api"
+AUTH_MARKER="$COPILOT_STATE_DIR/.nanobot-auth-ok"
 mkdir -p "$COPILOT_STATE_DIR"
 
-if [[ -z "$(find "$COPILOT_STATE_DIR" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
+if [[ ! -f "$AUTH_MARKER" ]]; then
   echo "No copilot-api auth state found. Starting one-time login..."
   npx copilot-api@latest auth
+  touch "$AUTH_MARKER"
 else
-  echo "Existing copilot-api auth state found. Skipping login."
+  echo "Existing copilot-api auth marker found. Skipping login."
 fi
 
 python - "$CONFIG_PATH" "$MODEL" "$PORT" <<'PY'
@@ -38,10 +40,13 @@ config_path = Path(sys.argv[1]).expanduser()
 model = sys.argv[2]
 port = sys.argv[3]
 
-if config_path.exists():
-    data = json.loads(config_path.read_text(encoding="utf-8"))
-else:
-    data = {}
+try:
+    if config_path.exists():
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    else:
+        data = {}
+except json.JSONDecodeError as exc:
+    raise SystemExit(f"Invalid JSON in {config_path}: {exc}") from exc
 
 providers = data.setdefault("providers", {})
 providers.setdefault("copilotApi", {})
@@ -53,7 +58,10 @@ defaults = agents.setdefault("defaults", {})
 defaults["provider"] = "copilot_api"
 defaults["model"] = model
 
-config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+try:
+    config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+except OSError as exc:
+    raise SystemExit(f"Failed to write config {config_path}: {exc}") from exc
 PY
 
 echo "Done."
