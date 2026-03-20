@@ -8,8 +8,9 @@
 
 ;; Keep network locked down to localhost so nanobot can talk to local copilot-api only.
 (allow network-outbound
-    (remote ip "127.0.0.1:1-65535")
-    (remote ip "::1:1-65535"))
+    (remote ip "127.0.0.1")
+    (remote ip "::1")
+    (remote ip "localhost"))
 
 ;; Read access is broad for Python/runtime/framework files.
 (allow file-read*)
