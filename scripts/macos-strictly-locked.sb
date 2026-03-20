@@ -1,0 +1,22 @@
+(version 1)
+(deny default)
+(import "system.sb")
+
+;; Allow process basics
+(allow process*)
+(allow signal (target self))
+
+;; Keep network locked down to localhost so nanobot can talk to local copilot-api only.
+(allow network-outbound
+    (remote ip "127.0.0.1:1-65535")
+    (remote ip "::1:1-65535"))
+
+;; Read access is broad for Python/runtime/framework files.
+(allow file-read*)
+
+;; Write access is constrained to nanobot state/workspace + temp dirs.
+(allow file-write*
+    (subpath (param "NANOBOT_HOME"))
+    (subpath (param "NANOBOT_WORKSPACE"))
+    (subpath "/private/tmp")
+    (subpath "/tmp"))

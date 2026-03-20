@@ -858,11 +858,25 @@ scripts/startup-copilot-api-nanobot.sh gateway
 scripts/startup-copilot-api-nanobot.sh agent -m "hello"
 ```
 
+**2.1 Optional macOS native sandbox (container-like isolation):**
+```bash
+# macOS only: launch the same startup flow under sandbox-exec
+scripts/startup-copilot-api-nanobot-sandbox.sh gateway
+```
+
+This keeps Docker support intact, while offering a lighter kernel-level isolation option on macOS.
+The default profile is `scripts/macos-strictly-locked.sb` and allows:
+- localhost network only (so nanobot can reach local copilot-api),
+- writes only under `~/.nanobot`, workspace, and temp dirs.
+
 **3. Optional environment overrides:**
 ```bash
 export COPILOT_API_PORT=4141
 export COPILOT_API_DATA_HOME="$HOME/.nanobot/copilot-api-data"
 export NANOBOT_COPILOT_MODEL="gpt-4.1"
+export NANOBOT_HOME="$HOME/.nanobot"
+export NANOBOT_WORKSPACE="$HOME/.nanobot/workspace"
+export NANOBOT_SANDBOX_PROFILE="$PWD/scripts/macos-strictly-locked.sb"
 ```
 
 `scripts/setup-copilot-api-npx.sh` writes:
