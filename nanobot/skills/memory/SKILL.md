@@ -32,6 +32,16 @@ Write important facts immediately using `edit_file` or `write_file`:
 - Project context ("The API uses OAuth2")
 - Relationships ("Alice is the project lead")
 
+## Optional: Push Memory to a Persistent GitHub Repo
+
+If the user wants durable backup/sync of memory across machines, keep `memory/` in a Git repo and push updates:
+
+- `git add memory/MEMORY.md memory/HISTORY.md`
+- `git commit -m "Update memory state"`
+- `git push origin main`
+
+When this is enabled, prefer small, frequent commits after meaningful memory updates.
+
 ## Auto-consolidation
 
 Old conversations are automatically summarized and appended to HISTORY.md when the session grows large. Long-term facts are extracted to MEMORY.md. You don't need to manage this.

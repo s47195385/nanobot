@@ -165,6 +165,14 @@ def test_config_matches_openai_codex_with_hyphen_prefix():
     assert config.get_provider_name() == "openai_codex"
 
 
+def test_config_matches_copilot_api_with_hyphen_prefix_without_api_key():
+    config = Config()
+    config.agents.defaults.model = "copilot-api/gpt-4.1"
+
+    assert config.get_provider_name() == "copilot_api"
+    assert config.get_api_base() == "http://127.0.0.1:4141/v1"
+
+
 def test_config_matches_explicit_ollama_prefix_without_api_key():
     config = Config()
     config.agents.defaults.model = "ollama/llama3.2"
@@ -268,6 +276,29 @@ def test_make_provider_passes_extra_headers_to_custom_provider():
     assert kwargs["base_url"] == "https://example.com/v1"
     assert kwargs["default_headers"]["APP-Code"] == "demo-app"
     assert kwargs["default_headers"]["x-session-affinity"] == "sticky-session"
+
+
+def test_make_provider_builds_copilot_api_provider_with_default_local_base():
+    config = Config.model_validate(
+        {
+            "agents": {"defaults": {"provider": "copilot_api", "model": "gpt-4.1"}},
+            "providers": {
+                "copilotApi": {
+                    "extraHeaders": {
+                        "x-test-header": "copilot-api",
+                    },
+                }
+            },
+        }
+    )
+
+    with patch("nanobot.providers.custom_provider.AsyncOpenAI") as mock_async_openai:
+        _make_provider(config)
+
+    kwargs = mock_async_openai.call_args.kwargs
+    assert kwargs["api_key"] == "no-key"
+    assert kwargs["base_url"] == "http://127.0.0.1:4141/v1"
+    assert kwargs["default_headers"]["x-test-header"] == "copilot-api"
 
 
 @pytest.fixture
