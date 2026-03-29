@@ -8,14 +8,14 @@ def test_apply_role_preset_prepends_role_agents_file() -> None:
 
     builder.apply_role_preset("programmer")
 
-    assert builder.BOOTSTRAP_FILES[0] == "AGENTS.programmer.md"
-    assert "AGENTS.md" in builder.BOOTSTRAP_FILES
+    assert builder.bootstrap_files[0] == "AGENTS.programmer.md"
+    assert "AGENTS.md" in builder.bootstrap_files
 
 
 def test_apply_role_preset_ignores_unknown_role() -> None:
     builder = ContextBuilder(Path("/tmp/workspace"))
-    original = list(builder.BOOTSTRAP_FILES)
+    original = list(builder.bootstrap_files)
 
     builder.apply_role_preset("unknown-role")
 
-    assert builder.BOOTSTRAP_FILES == original
+    assert builder.bootstrap_files == original

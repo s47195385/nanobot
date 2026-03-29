@@ -16,12 +16,15 @@ from nanobot.utils.helpers import build_assistant_message, detect_image_mime
 class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
-    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
+    BOOTSTRAP_FILES = ("AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md")
     ROLE_PRESET_MAP = {
         "programmer": "AGENTS.programmer.md",
         "researcher": "AGENTS.researcher.md",
         "business_analyst": "AGENTS.business_analyst.md",
         "consultant": "AGENTS.consultant.md",
+    }
+    ROLE_PRESET_ALIASES = {
+        "business analyst": "business_analyst",
     }
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
@@ -29,7 +32,7 @@ class ContextBuilder:
         self.workspace = workspace
         self.memory = MemoryStore(workspace)
         self.skills = SkillsLoader(workspace)
-        self.BOOTSTRAP_FILES = list(type(self).BOOTSTRAP_FILES)
+        self.bootstrap_files = list(type(self).BOOTSTRAP_FILES)
 
     def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
@@ -116,7 +119,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         """Load all bootstrap files from workspace."""
         parts = []
 
-        for filename in self.BOOTSTRAP_FILES:
+        for filename in self.bootstrap_files:
             file_path = self.workspace / filename
             if file_path.exists():
                 content = file_path.read_text(encoding="utf-8")
@@ -128,12 +131,13 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         """Apply optional role preset by prepending a role-specific AGENTS file."""
         if not role:
             return
-        key = str(role).strip().lower().replace(" ", "_")
+        key = str(role).strip().lower()
+        key = self.ROLE_PRESET_ALIASES.get(key, key)
         preset = self.ROLE_PRESET_MAP.get(key)
         if not preset:
             return
-        if preset not in self.BOOTSTRAP_FILES:
-            self.BOOTSTRAP_FILES = [preset, *self.BOOTSTRAP_FILES]
+        if preset not in self.bootstrap_files:
+            self.bootstrap_files = [preset, *self.bootstrap_files]
 
     def build_messages(
         self,
