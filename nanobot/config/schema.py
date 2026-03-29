@@ -42,7 +42,7 @@ class AgentDefaults(Base):
     # Deprecated compatibility field: accepted from old configs but ignored at runtime.
     memory_window: int | None = Field(default=None, exclude=True)
     reasoning_effort: str | None = None  # low / medium / high — enables LLM thinking mode
-    role: str | None = None  # Optional role preset: programmer/researcher/business_analyst/consultant
+    role: Literal["programmer", "researcher", "business_analyst", "consultant"] | None = None  # Optional role preset
     planner_model: str | None = Field(
         default=None,
         alias="plannerModel",

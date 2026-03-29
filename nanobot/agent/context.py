@@ -17,7 +17,7 @@ class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
     # Template defaults; copied per-instance into self.bootstrap_files.
-    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
+    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "REQUIREMENTS.md", "TASKS.md"]
     ROLE_PRESET_MAP = {
         "programmer": "AGENTS.programmer.md",
         "researcher": "AGENTS.researcher.md",
@@ -157,12 +157,15 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             return
         role_files = [preset, *self.ROLE_EXTRA_FILES.get(key, [])]
         new_bootstrap: list[str] = []
+        seen: set[str] = set()
         for rf in role_files:
-            if rf not in new_bootstrap:
+            if rf not in seen:
                 new_bootstrap.append(rf)
+                seen.add(rf)
         for existing in self.bootstrap_files:
-            if existing not in new_bootstrap:
+            if existing not in seen:
                 new_bootstrap.append(existing)
+                seen.add(existing)
         self.bootstrap_files = new_bootstrap
 
     def build_messages(
