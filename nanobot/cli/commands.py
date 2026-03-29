@@ -505,6 +505,7 @@ def gateway(
         session_manager=session_manager,
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
+        role=config.agents.defaults.role,
     )
 
     # Set cron callback (needs agent)
@@ -597,10 +598,11 @@ def gateway(
         await bus.publish_outbound(OutboundMessage(channel=channel, chat_id=chat_id, content=response))
 
     hb_cfg = config.gateway.heartbeat
+    planner_model = config.agents.defaults.planner_model or agent.model
     heartbeat = HeartbeatService(
         workspace=config.workspace_path,
         provider=provider,
-        model=agent.model,
+        model=planner_model,
         on_execute=on_heartbeat_execute,
         on_notify=on_heartbeat_notify,
         interval_s=hb_cfg.interval_s,
@@ -696,6 +698,7 @@ def agent(
         restrict_to_workspace=config.tools.restrict_to_workspace,
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
+        role=config.agents.defaults.role,
     )
 
     # Shared reference for progress callbacks

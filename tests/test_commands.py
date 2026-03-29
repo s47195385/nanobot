@@ -387,6 +387,15 @@ def test_agent_overrides_workspace_path(mock_agent_runtime):
     assert mock_agent_runtime["agent_loop_cls"].call_args.kwargs["workspace"] == workspace_path
 
 
+def test_agent_passes_role_to_agent_loop(mock_agent_runtime):
+    mock_agent_runtime["config"].agents.defaults.role = "programmer"
+
+    result = runner.invoke(app, ["agent", "-m", "hello"])
+
+    assert result.exit_code == 0
+    assert mock_agent_runtime["agent_loop_cls"].call_args.kwargs["role"] == "programmer"
+
+
 def test_agent_workspace_override_wins_over_config_workspace(mock_agent_runtime, tmp_path: Path):
     config_path = tmp_path / "agent-config.json"
     config_path.write_text("{}")
@@ -569,3 +578,80 @@ def test_gateway_cli_port_overrides_configured_port(monkeypatch, tmp_path: Path)
 
     assert isinstance(result.exception, _StopGateway)
     assert "port 18792" in result.stdout
+
+
+def test_gateway_uses_planner_model_for_heartbeat(monkeypatch, tmp_path: Path) -> None:
+    config_file = tmp_path / "instance" / "config.json"
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text("{}")
+
+    config = Config()
+    config.agents.defaults.planner_model = "anthropic/claude-opus-4-5"
+    seen: dict[str, str] = {}
+
+    monkeypatch.setattr("nanobot.config.loader.set_config_path", lambda _path: None)
+    monkeypatch.setattr("nanobot.config.loader.load_config", lambda _path=None: config)
+    monkeypatch.setattr("nanobot.cli.commands.sync_workspace_templates", lambda _path: None)
+    monkeypatch.setattr("nanobot.cli.commands._make_provider", lambda _config: object())
+    monkeypatch.setattr("nanobot.bus.queue.MessageBus", lambda: object())
+    monkeypatch.setattr("nanobot.session.manager.SessionManager", lambda _workspace: object())
+
+    class _FakeAgentLoop:
+        def __init__(self, *args, **kwargs) -> None:
+            self.model = kwargs.get("model")
+
+        async def run(self):
+            return None
+
+        async def close_mcp(self):
+            return None
+
+        def stop(self):
+            return None
+
+    class _FakeCronService:
+        def __init__(self, _store):
+            self.on_job = None
+
+        def status(self):
+            return {"jobs": 0}
+
+        async def start(self):
+            return None
+
+        def stop(self):
+            return None
+
+    class _FakeHeartbeatService:
+        def __init__(self, *args, **kwargs) -> None:
+            seen["model"] = kwargs["model"]
+            raise _StopGateway("stop")
+
+        async def start(self):
+            return None
+
+        def stop(self):
+            return None
+
+    class _FakeChannelManager:
+        enabled_channels = []
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def start_all(self):
+            return None
+
+        async def stop_all(self):
+            return None
+
+    monkeypatch.setattr("nanobot.agent.loop.AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr("nanobot.cron.service.CronService", _FakeCronService)
+    monkeypatch.setattr("nanobot.channels.manager.ChannelManager", _FakeChannelManager)
+    monkeypatch.setattr("nanobot.heartbeat.service.HeartbeatService", _FakeHeartbeatService)
+
+    with patch("asyncio.run", side_effect=_StopGateway("stop")):
+        result = runner.invoke(app, ["gateway", "--config", str(config_file)])
+
+    assert isinstance(result.exception, _StopGateway)
+    assert seen["model"] == "anthropic/claude-opus-4-5"

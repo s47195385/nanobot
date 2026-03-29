@@ -17,6 +17,12 @@ class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
     BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
+    ROLE_PRESET_MAP = {
+        "programmer": "AGENTS.programmer.md",
+        "researcher": "AGENTS.researcher.md",
+        "business_analyst": "AGENTS.business_analyst.md",
+        "consultant": "AGENTS.consultant.md",
+    }
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
     def __init__(self, workspace: Path):
@@ -116,6 +122,17 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
                 parts.append(f"## {filename}\n\n{content}")
 
         return "\n\n".join(parts) if parts else ""
+
+    def apply_role_preset(self, role: str | None) -> None:
+        """Apply optional role preset by prepending a role-specific AGENTS file."""
+        if not role:
+            return
+        key = str(role).strip().lower().replace(" ", "_")
+        preset = self.ROLE_PRESET_MAP.get(key)
+        if not preset:
+            return
+        if preset not in self.BOOTSTRAP_FILES:
+            self.BOOTSTRAP_FILES = [preset, *self.BOOTSTRAP_FILES]
 
     def build_messages(
         self,

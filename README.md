@@ -1258,6 +1258,14 @@ nanobot gateway --config ~/.nanobot-telegram/config.json
 nanobot gateway --config ~/.nanobot-discord/config.json
 ```
 
+### Claude-Code-style wrapper startup (Discord multi-project)
+
+If you want a wrapper-based workflow (no hard fork of core logic) with project isolation, Discord channel scoping, planner/worker model split, and role presets, see:
+
+- [`docs/CLAUDE_CODE_STYLE_STARTUP.md`](docs/CLAUDE_CODE_STYLE_STARTUP.md)
+
+It uses `scripts/startup_multi_project_discord.py` to launch one isolated gateway per project/channel.
+
 Override workspace for one-off runs when needed:
 
 ```bash
