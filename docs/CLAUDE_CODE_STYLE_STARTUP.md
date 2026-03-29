@@ -20,7 +20,7 @@ This guide shows how to run nanobot with a wrapper workflow inspired by Claude C
 Use:
 
 ```bash
-python /home/runner/work/nanobot/nanobot/scripts/startup_multi_project_discord.py \
+python scripts/startup_multi_project_discord.py \
   --discord-token "$DISCORD_BOT_TOKEN" \
   --allow-user "YOUR_DISCORD_USER_ID" \
   --project projA:/abs/path/to/project-a:123456789012345678 \
@@ -37,7 +37,7 @@ Each `--project` starts a dedicated gateway instance with:
 ### Dry run
 
 ```bash
-python /home/runner/work/nanobot/nanobot/scripts/startup_multi_project_discord.py \
+python scripts/startup_multi_project_discord.py \
   --discord-token "$DISCORD_BOT_TOKEN" \
   --allow-user "YOUR_DISCORD_USER_ID" \
   --project projA:/abs/path/to/project-a:123456789012345678 \

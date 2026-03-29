@@ -5,8 +5,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "startup_multi_project_discord.py"
+
+
 def test_startup_wrapper_requires_allow_list_unless_explicit_allow_all(tmp_path: Path) -> None:
-    script = "/home/runner/work/nanobot/nanobot/scripts/startup_multi_project_discord.py"
+    script = str(SCRIPT_PATH)
     project_dir = tmp_path / "project"
     project_dir.mkdir()
 
@@ -29,7 +32,7 @@ def test_startup_wrapper_requires_allow_list_unless_explicit_allow_all(tmp_path:
 
 
 def test_startup_wrapper_writes_isolated_config(tmp_path: Path) -> None:
-    script = "/home/runner/work/nanobot/nanobot/scripts/startup_multi_project_discord.py"
+    script = str(SCRIPT_PATH)
     project_dir = tmp_path / "project"
     project_dir.mkdir()
     base_cfg = tmp_path / "base.json"
