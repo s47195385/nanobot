@@ -43,7 +43,10 @@ class AgentDefaults(Base):
     memory_window: int | None = Field(default=None, exclude=True)
     reasoning_effort: str | None = None  # low / medium / high — enables LLM thinking mode
     role: str | None = None  # Optional role preset: programmer/researcher/business_analyst/consultant
-    planner_model: str | None = None  # Optional model used for heartbeat planning only
+    planner_model: str | None = Field(
+        default=None,
+        alias="plannerModel",
+    )  # Optional model used for heartbeat planning only
 
     @property
     def should_warn_deprecated_memory_window(self) -> bool:

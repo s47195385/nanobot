@@ -16,8 +16,8 @@ from nanobot.utils.helpers import build_assistant_message, detect_image_mime
 class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
-    # Immutable template defaults; copied per-instance into self.bootstrap_files.
-    BOOTSTRAP_FILES = ("AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md")
+    # Template defaults; copied per-instance into self.bootstrap_files.
+    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
     ROLE_PRESET_MAP = {
         "programmer": "AGENTS.programmer.md",
         "researcher": "AGENTS.researcher.md",
