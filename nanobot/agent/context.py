@@ -155,12 +155,15 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         preset = self.ROLE_PRESET_MAP.get(key)
         if not preset:
             return
-        if preset not in self.bootstrap_files:
-            self.bootstrap_files = [preset, *self.bootstrap_files]
-        extras = self.ROLE_EXTRA_FILES.get(key, [])
-        for extra in reversed(extras):
-            if extra not in self.bootstrap_files:
-                self.bootstrap_files.insert(1, extra)
+        role_files = [preset, *self.ROLE_EXTRA_FILES.get(key, [])]
+        new_bootstrap: list[str] = []
+        for rf in role_files:
+            if rf not in new_bootstrap:
+                new_bootstrap.append(rf)
+        for existing in self.bootstrap_files:
+            if existing not in new_bootstrap:
+                new_bootstrap.append(existing)
+        self.bootstrap_files = new_bootstrap
 
     def build_messages(
         self,
