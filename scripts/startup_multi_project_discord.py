@@ -56,6 +56,7 @@ def _write_instance_config(
     discord = cfg["channels"]["discord"]
     discord["enabled"] = True
     discord["token"] = args.discord_token
+    # Parser enforces: when allow_all_users is False, at least one allow_user is provided.
     discord["allowFrom"] = ["*"] if args.allow_all_users else [u.strip() for u in args.allow_user]
     discord["allowChannelIds"] = [channel_id]
 
