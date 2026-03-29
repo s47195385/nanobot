@@ -65,6 +65,8 @@ def _write_instance_config(
         cfg["channels"]["sendToolHints"] = False
 
     cfg["gateway"]["heartbeat"]["enabled"] = not args.disable_heartbeat
+    if args.heartbeat_interval:
+        cfg["gateway"]["heartbeat"]["intervalS"] = int(args.heartbeat_interval)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{name}.config.json"
@@ -96,6 +98,12 @@ def main() -> int:
     )
     p.add_argument("--max-tokens", type=int, default=4096)
     p.add_argument("--context-window-tokens", type=int, default=32768)
+    p.add_argument(
+        "--heartbeat-interval",
+        type=int,
+        default=3600,
+        help="Heartbeat interval seconds (queue cadence). Default: 3600 (1h).",
+    )
     p.add_argument(
         "--token-optimized",
         action=argparse.BooleanOptionalAction,

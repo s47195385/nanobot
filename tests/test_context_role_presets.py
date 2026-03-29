@@ -10,6 +10,9 @@ def test_apply_role_preset_prepends_role_agents_file() -> None:
 
     assert builder.bootstrap_files[0] == "AGENTS.programmer.md"
     assert "AGENTS.md" in builder.bootstrap_files
+    # Extra workflow templates for role should be inserted after the role preset.
+    assert builder.bootstrap_files[1] == "PROGRAMMER.WORKFLOWS.md"
+    assert "PROGRAMMER.BYPRODUCTS.md" in builder.bootstrap_files
 
 
 def test_apply_role_preset_ignores_unknown_role() -> None:

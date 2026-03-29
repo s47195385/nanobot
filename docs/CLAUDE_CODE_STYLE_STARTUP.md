@@ -24,7 +24,9 @@ python scripts/startup_multi_project_discord.py \
   --discord-token "$DISCORD_BOT_TOKEN" \
   --allow-user "YOUR_DISCORD_USER_ID" \
   --project projA:/abs/path/to/project-a:123456789012345678 \
-  --project projB:/abs/path/to/project-b:223456789012345678
+  --project projB:/abs/path/to/project-b:223456789012345678 \
+  --heartbeat-interval 3600 \
+  --role business_analyst
 ```
 
 Each `--project` starts a dedicated gateway instance with:
@@ -41,6 +43,7 @@ python scripts/startup_multi_project_discord.py \
   --discord-token "$DISCORD_BOT_TOKEN" \
   --allow-user "YOUR_DISCORD_USER_ID" \
   --project projA:/abs/path/to/project-a:123456789012345678 \
+  --heartbeat-interval 1800 \
   --dry-run
 ```
 
@@ -62,6 +65,16 @@ python scripts/startup_multi_project_discord.py \
     "discord": {
       "allowChannelIds": ["123456789012345678"]
     }
+  },
+  "tools": {
+    "mcpServers": {
+      "geminiCli": {
+        "type": "stdio",
+        "command": "gemini",             // gemini CLI MCP server
+        "args": ["mcp", "serve"],
+        "toolTimeout": 60
+      }
+    }
   }
 }
 ```
@@ -71,3 +84,17 @@ python scripts/startup_multi_project_discord.py \
 - nanobot already has heartbeat-based periodic execution via `HEARTBEAT.md`.
 - With `plannerModel`, you can choose a stronger planning model for heartbeat decision/planning while keeping a different worker model for normal agent execution.
 - For granular queued work, keep tasks in `HEARTBEAT.md` and let the planner/worker flow process them over heartbeat intervals.
+- The wrapper flag `--heartbeat-interval` sets the cadence (e.g., `3600` for hourly PM-led nudges).
+
+## Suggested multi-model flow (Gemini CLI MCP + Claude/GitHub Copilot)
+
+1) **Elicit requirements with Gemini CLI (MCP)**  
+   - Configure the MCP server above. Use the `business_analyst` role to run structured discovery question sets (see `BA.WORKFLOWS.md`).
+2) **Plan with a stronger planner model**  
+   - Set `plannerModel` to `anthropic/claude-opus-4-5` (or GitHub Copilot endpoint). Output: modular work plan + backlog + acceptance tests.
+3) **Execute with Gemini CLI**  
+   - Keep `agents.defaults.model` pointing to a Gemini-compatible endpoint for the worker loop to implement tasks.
+4) **Heartbeat queue**  
+   - Maintain tasks in `HEARTBEAT.md`; set `--heartbeat-interval 3600` for hourly check-ins. The PM can edit the file to reprioritize between beats.
+5) **Standup/status**  
+   - Use the role byproducts templates (e.g., `PROGRAMMER.BYPRODUCTS.md`, `BA.BYPRODUCTS.md`) to summarize progress, blockers, and next steps.

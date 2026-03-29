@@ -24,6 +24,24 @@ class ContextBuilder:
         "business_analyst": "AGENTS.business_analyst.md",
         "consultant": "AGENTS.consultant.md",
     }
+    ROLE_EXTRA_FILES = {
+        "programmer": [
+            "PROGRAMMER.WORKFLOWS.md",
+            "PROGRAMMER.BYPRODUCTS.md",
+        ],
+        "researcher": [
+            "RESEARCHER.WORKFLOWS.md",
+            "RESEARCHER.BYPRODUCTS.md",
+        ],
+        "business_analyst": [
+            "BA.WORKFLOWS.md",
+            "BA.BYPRODUCTS.md",
+        ],
+        "consultant": [
+            "CONSULTANT.WORKFLOWS.md",
+            "CONSULTANT.BYPRODUCTS.md",
+        ],
+    }
     ROLE_PRESET_ALIASES = {
         "business analyst": "business_analyst",
     }
@@ -139,6 +157,10 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             return
         if preset not in self.bootstrap_files:
             self.bootstrap_files = [preset, *self.bootstrap_files]
+        extras = self.ROLE_EXTRA_FILES.get(key, [])
+        for extra in reversed(extras):
+            if extra not in self.bootstrap_files:
+                self.bootstrap_files.insert(1, extra)
 
     def build_messages(
         self,

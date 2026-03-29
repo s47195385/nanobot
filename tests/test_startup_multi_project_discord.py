@@ -51,6 +51,8 @@ def test_startup_wrapper_writes_isolated_config(tmp_path: Path) -> None:
         str(base_cfg),
         "--instance-dir",
         str(instance_dir),
+        "--heartbeat-interval",
+        "3600",
         "--dry-run",
     ]
 
@@ -67,3 +69,4 @@ def test_startup_wrapper_writes_isolated_config(tmp_path: Path) -> None:
     assert data["tools"]["restrictToWorkspace"] is True
     assert data["channels"]["discord"]["allowChannelIds"] == ["123"]
     assert data["agents"]["defaults"]["workspace"] == str(project_dir.resolve())
+    assert data["gateway"]["heartbeat"]["intervalS"] == 3600
