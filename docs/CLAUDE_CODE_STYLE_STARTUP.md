@@ -26,6 +26,7 @@ python scripts/startup_multi_project_discord.py \
   --project projA:/abs/path/to/project-a:123456789012345678 \
   --project projB:/abs/path/to/project-b:223456789012345678 \
   --heartbeat-interval 3600 \
+  --heartbeat-auto-shutdown \
   --role business_analyst
 ```
 
@@ -53,7 +54,7 @@ python scripts/startup_multi_project_discord.py \
 {
   "agents": {
     "defaults": {
-      "model": "openrouter/your-model",
+      "model": "google/gemini-3.0-flash-preview-ol", // example: Gemini 3 Flash via Ollama-cloud-style endpoint
       "role": "programmer"
     }
   },
@@ -68,4 +69,6 @@ python scripts/startup_multi_project_discord.py \
 - nanobot already has heartbeat-based periodic execution via `HEARTBEAT.md`.
 - Keep tasks modular/granular in `TASKS.md` (and optionally mirror high-priority items into `HEARTBEAT.md` for timed execution).
 - Capture upstream context in `REQUIREMENTS.md` — the agent reads this alongside role presets.
-- The wrapper flag `--heartbeat-interval` sets the cadence (e.g., `3600` for hourly PM-led nudges).
+- The wrapper flags `--heartbeat-interval` sets the cadence (e.g., `3600` for hourly PM-led nudges) and `--heartbeat-auto-shutdown` exits the gateway when the heartbeat reports no active tasks.
+- For macOS isolation, you can wrap the gateway with `sandbox-exec` as shown in `scripts/startup-copilot-api-nanobot-sandbox.sh`.
+- Discord updates: the wrapper already restricts to specific channel IDs; heartbeat notifications are delivered to the most recent non-CLI session.

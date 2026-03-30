@@ -67,6 +67,8 @@ def _write_instance_config(
     cfg["gateway"]["heartbeat"]["enabled"] = not args.disable_heartbeat
     if args.heartbeat_interval:
         cfg["gateway"]["heartbeat"]["intervalS"] = int(args.heartbeat_interval)
+    if args.heartbeat_auto_shutdown:
+        cfg["gateway"]["heartbeat"]["autoShutdown"] = True
 
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{name}.config.json"
@@ -103,6 +105,11 @@ def main() -> int:
         type=int,
         default=3600,
         help="Heartbeat interval seconds (queue cadence). Default: 3600 (1h).",
+    )
+    p.add_argument(
+        "--heartbeat-auto-shutdown",
+        action="store_true",
+        help="Shutdown the gateway when heartbeat reports no active tasks.",
     )
     p.add_argument(
         "--token-optimized",

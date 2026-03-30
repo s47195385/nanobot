@@ -599,6 +599,12 @@ def gateway(
 
     hb_cfg = config.gateway.heartbeat
     planner_model = config.agents.defaults.planner_model or agent.model
+    stop_event = asyncio.Event()
+
+    async def on_auto_shutdown(reason: str) -> None:
+        console.print(f"[yellow]Heartbeat requested auto-shutdown[/yellow]: {reason}")
+        stop_event.set()
+
     heartbeat = HeartbeatService(
         workspace=config.workspace_path,
         provider=provider,
@@ -607,6 +613,8 @@ def gateway(
         on_notify=on_heartbeat_notify,
         interval_s=hb_cfg.interval_s,
         enabled=hb_cfg.enabled,
+        auto_shutdown=hb_cfg.auto_shutdown,
+        on_shutdown=on_auto_shutdown,
     )
 
     if channels.enabled_channels:
@@ -624,10 +632,11 @@ def gateway(
         try:
             await cron.start()
             await heartbeat.start()
-            await asyncio.gather(
-                agent.run(),
-                channels.start_all(),
-            )
+            agent_task = asyncio.create_task(agent.run())
+            channel_task = asyncio.create_task(channels.start_all())
+
+            # Wait for stop signal (auto-shutdown or interrupt)
+            await stop_event.wait()
         except KeyboardInterrupt:
             console.print("\nShutting down...")
         except Exception:
@@ -639,6 +648,9 @@ def gateway(
             heartbeat.stop()
             cron.stop()
             agent.stop()
+            channel_task.cancel()
+            agent_task.cancel()
+            await asyncio.gather(agent_task, channel_task, return_exceptions=True)
             await channels.stop_all()
 
     asyncio.run(run())

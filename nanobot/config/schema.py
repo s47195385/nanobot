@@ -100,6 +100,7 @@ class HeartbeatConfig(Base):
 
     enabled: bool = True
     interval_s: int = 30 * 60  # 30 minutes
+    auto_shutdown: bool = False  # Stop gateway when heartbeat reports no active tasks
 
 
 class GatewayConfig(Base):
