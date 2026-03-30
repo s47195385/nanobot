@@ -47,6 +47,20 @@ class AgentLoop:
     """
 
     _TOOL_RESULT_MAX_CHARS = 16_000
+    _DISCOVERY_QUESTIONS = [
+        "What problem are we solving, and why now?",
+        "Who are the primary users and decision-makers?",
+        "What are the top 3 business outcomes expected in the first 90 days?",
+        "What is out of scope for v1?",
+        "What are the must-have features for launch?",
+        "What integrations or data sources are mandatory?",
+        "What legal, security, or compliance constraints apply?",
+        "What success metrics and target thresholds define success?",
+        "What is the launch timeline and milestone cadence?",
+        "What budget or resource constraints exist?",
+        "What operational risks could block delivery?",
+        "What quality bar and acceptance criteria must be met?",
+    ]
 
     def __init__(
         self,
@@ -224,12 +238,13 @@ class AgentLoop:
                 )
 
                 for tool_call in response.tool_calls:
-                    tools_used.append(tool_call.name)
+                    tool_name = tool_call.name or "invalid_tool"
+                    tools_used.append(tool_name)
                     args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
-                    logger.info("Tool call: {}({})", tool_call.name, args_str[:200])
-                    result = await self.tools.execute(tool_call.name, tool_call.arguments)
+                    logger.info("Tool call: {}({})", tool_name, args_str[:200])
+                    result = await self.tools.execute(tool_name, tool_call.arguments)
                     messages = self.context.add_tool_result(
-                        messages, tool_call.id, tool_call.name, result
+                        messages, tool_call.id, tool_name, result
                     )
             else:
                 clean = self._strip_think(response.content)
@@ -390,7 +405,8 @@ class AgentLoop:
         session = self.sessions.get_or_create(key)
 
         # Slash commands
-        cmd = msg.content.strip().lower()
+        raw_cmd = msg.content.strip()
+        cmd = raw_cmd.lower()
         if cmd == "/new":
             snapshot = session.messages[session.last_consolidated:]
             session.clear()
@@ -408,11 +424,17 @@ class AgentLoop:
                 "/new — Start a new conversation",
                 "/stop — Stop the current task",
                 "/restart — Restart the bot",
+                "/project-init <name> — Create an agile project doc set",
+                "/project-plan <name>: <goal> — Run MCP planner tool if available",
                 "/help — Show available commands",
             ]
             return OutboundMessage(
                 channel=msg.channel, chat_id=msg.chat_id, content="\n".join(lines),
             )
+        if cmd.startswith("/project-init"):
+            return await self._handle_project_init(msg, raw_cmd)
+        if cmd.startswith("/project-plan"):
+            return await self._handle_project_plan(msg, raw_cmd)
         await self.memory_consolidator.maybe_consolidate_by_tokens(session)
 
         self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))
@@ -455,6 +477,149 @@ class AgentLoop:
         return OutboundMessage(
             channel=msg.channel, chat_id=msg.chat_id, content=final_content,
             metadata=msg.metadata or {},
+        )
+
+    async def _handle_project_init(self, msg: InboundMessage, raw_cmd: str) -> OutboundMessage:
+        """Create project workspace and agile-compliant docs skeleton."""
+        project_name = raw_cmd[len("/project-init"):].strip() or "new-project"
+        safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "-", project_name).strip("-").lower() or "new-project"
+        project_dir = self.workspace / "projects" / safe_name
+        docs_dir = project_dir / "docs"
+        docs_dir.mkdir(parents=True, exist_ok=True)
+
+        files = {
+            project_dir / "README.md": (
+                f"# {project_name}\n\n"
+                "This project was bootstrapped by `/project-init`.\n\n"
+                "## Working Agreements\n"
+                "- Keep requirements and backlog updated each sprint.\n"
+                "- Link implementation PRs to backlog items.\n"
+                "- Review risks weekly.\n"
+            ),
+            project_dir / "REQUIREMENTS.md": (
+                f"# Requirements: {project_name}\n\n"
+                "## Problem Statement\n-\n\n"
+                "## Users / Stakeholders\n-\n\n"
+                "## Goals and Success Metrics\n-\n\n"
+                "## Constraints / Assumptions\n-\n\n"
+                "## Risks / Dependencies\n-\n\n"
+                "## Acceptance Criteria\n-\n"
+            ),
+            project_dir / "TASKS.md": (
+                "# Task List\n\n"
+                "- [ ] T1: Discovery complete\n"
+                "- [ ] T2: Architecture baseline\n"
+                "- [ ] T3: Sprint 1 implementation\n"
+                "- [ ] T4: Validation and release\n"
+            ),
+            docs_dir / "DISCOVERY.md": (
+                "# Discovery Questionnaire\n\n"
+                + "\n".join(f"- [ ] Q{i+1}: {q}" for i, q in enumerate(self._DISCOVERY_QUESTIONS))
+                + "\n"
+            ),
+            docs_dir / "PRODUCT_BACKLOG.md": (
+                "# Product Backlog\n\n"
+                "| ID | Type | Priority | Description | Owner | Status |\n"
+                "|---|---|---|---|---|---|\n"
+            ),
+            docs_dir / "SPRINT_PLAN.md": (
+                "# Sprint Plan\n\n"
+                "## Sprint Goal\n-\n\n"
+                "## Committed Items\n-\n\n"
+                "## Definition of Done\n- Tests pass\n- Docs updated\n- Acceptance criteria verified\n"
+            ),
+            docs_dir / "ARCHITECTURE.md": (
+                "# Architecture\n\n"
+                "## Context\n-\n\n"
+                "## Components\n-\n\n"
+                "## Data Flow\n-\n\n"
+                "## Trade-offs\n-\n"
+            ),
+            docs_dir / "RISKS.md": (
+                "# Risk Register\n\n"
+                "| Risk | Impact | Likelihood | Mitigation | Owner |\n"
+                "|---|---|---|---|---|\n"
+            ),
+        }
+
+        for path, content in files.items():
+            if not path.exists():
+                path.write_text(content, encoding="utf-8")
+
+        question_block = "\n".join(f"{i+1}. {q}" for i, q in enumerate(self._DISCOVERY_QUESTIONS))
+        response = (
+            f"Project initialized at: {project_dir}\n\n"
+            "Agile docs created: README.md, REQUIREMENTS.md, TASKS.md, and docs/*\n"
+            "Answer these discovery questions to proceed:\n"
+            f"{question_block}\n\n"
+            "After you answer, ask me to update REQUIREMENTS.md and TASKS.md for this project."
+        )
+        return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, content=response)
+
+    async def _handle_project_plan(self, msg: InboundMessage, raw_cmd: str) -> OutboundMessage:
+        """Invoke an MCP planning tool deterministically when available."""
+        payload = raw_cmd[len("/project-plan"):].strip()
+        if not payload:
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content="Usage: /project-plan <project-name>: <planning goal>",
+            )
+
+        # Prefer known gemini MCP planning/analysis tools.
+        preferred = ("ask-gemini", "analyze", "plan", "sandbox-test")
+        mcp_tools = [name for name in self.tools.tool_names if name.startswith("mcp_")]
+        tool_candidates = [
+            name for name in mcp_tools
+            if "gemini" in name.lower() and any(key in name.lower() for key in preferred)
+        ]
+        if not tool_candidates:
+            tool_candidates = [name for name in mcp_tools if "gemini" in name.lower()]
+        if not tool_candidates:
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content=(
+                    "No Gemini MCP planning tool is currently connected. "
+                    "Configure tools.mcpServers in config and restart gateway."
+                ),
+            )
+
+        tool_name = tool_candidates[0]
+        tool = self.tools.get(tool_name)
+        params: dict[str, Any] = {}
+        if tool and isinstance(tool.parameters, dict):
+            schema = tool.parameters
+            required = schema.get("required", []) if isinstance(schema.get("required"), list) else []
+            props = schema.get("properties", {}) if isinstance(schema.get("properties"), dict) else {}
+            text_keys = ["prompt", "query", "input", "task", "request", "text", "instructions"]
+
+            for key in required:
+                if key in text_keys:
+                    params[key] = payload
+                elif key in ("project", "project_name", "name"):
+                    params[key] = payload.split(":", 1)[0].strip()
+                else:
+                    params[key] = ""
+
+            if not params:
+                for key in text_keys:
+                    if key in props:
+                        params[key] = payload
+                        break
+
+        # Last resort for generic single-argument tool schemas.
+        if not params and tool and isinstance(tool.parameters, dict):
+            props = tool.parameters.get("properties", {})
+            if isinstance(props, dict) and len(props) == 1:
+                only_key = next(iter(props.keys()))
+                params[only_key] = payload
+
+        result = await self.tools.execute(tool_name, params)
+        return OutboundMessage(
+            channel=msg.channel,
+            chat_id=msg.chat_id,
+            content=f"Planner tool `{tool_name}` result:\n\n{result}",
         )
 
     def _save_turn(self, session: Session, messages: list[dict], skip: int) -> None:

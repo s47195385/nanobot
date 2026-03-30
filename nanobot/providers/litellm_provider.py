@@ -190,6 +190,12 @@ class LiteLLMProvider(LLMProvider):
             return id_map.setdefault(value, LiteLLMProvider._normalize_tool_call_id(value))
 
         for clean in sanitized:
+            # Some providers may emit tool responses without a function name.
+            # Ollama/Gemini requires function_response.name to be non-empty.
+            if clean.get("role") == "tool" and not clean.get("name"):
+                fallback_id = str(clean.get("tool_call_id") or "unknown")
+                clean["name"] = f"tool_{fallback_id}"
+
             # Keep assistant tool_calls[].id and tool tool_call_id in sync after
             # shortening, otherwise strict providers reject the broken linkage.
             if isinstance(clean.get("tool_calls"), list):

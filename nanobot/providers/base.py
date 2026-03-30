@@ -20,11 +20,12 @@ class ToolCallRequest:
 
     def to_openai_tool_call(self) -> dict[str, Any]:
         """Serialize to an OpenAI-style tool_call payload."""
+        safe_name = self.name or "invalid_tool"
         tool_call = {
             "id": self.id,
             "type": "function",
             "function": {
-                "name": self.name,
+                "name": safe_name,
                 "arguments": json.dumps(self.arguments, ensure_ascii=False),
             },
         }

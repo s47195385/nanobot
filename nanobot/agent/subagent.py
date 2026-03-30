@@ -141,13 +141,14 @@ class SubagentManager:
 
                     # Execute tools
                     for tool_call in response.tool_calls:
+                        tool_name = tool_call.name or "invalid_tool"
                         args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
-                        logger.debug("Subagent [{}] executing: {} with arguments: {}", task_id, tool_call.name, args_str)
-                        result = await tools.execute(tool_call.name, tool_call.arguments)
+                        logger.debug("Subagent [{}] executing: {} with arguments: {}", task_id, tool_name, args_str)
+                        result = await tools.execute(tool_name, tool_call.arguments)
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call.id,
-                            "name": tool_call.name,
+                            "name": tool_name,
                             "content": result,
                         })
                 else:
