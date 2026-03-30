@@ -287,3 +287,69 @@ async def test_decide_prompt_includes_current_time(tmp_path) -> None:
     assert user_msg["role"] == "user"
     assert "Current Time:" in user_msg["content"]
 
+
+@pytest.mark.asyncio
+async def test_tick_triggers_auto_shutdown_on_empty(tmp_path) -> None:
+    """Auto-shutdown fires when heartbeat file is missing/empty."""
+    provider = DummyProvider([])
+    reasons: list[str] = []
+
+    async def _on_shutdown(reason: str) -> None:
+        reasons.append(reason)
+
+    service = HeartbeatService(
+        workspace=tmp_path,
+        provider=provider,
+        model="openai/gpt-4o-mini",
+        auto_shutdown=True,
+        on_shutdown=_on_shutdown,
+    )
+
+    await service._tick()
+    assert reasons
+    assert "missing or empty" in reasons[0]
+
+
+@pytest.mark.asyncio
+async def test_tick_triggers_auto_shutdown_after_run(tmp_path, monkeypatch) -> None:
+    """Auto-shutdown fires after a successful run when enabled."""
+    (tmp_path / "HEARTBEAT.md").write_text("- [ ] do thing", encoding="utf-8")
+
+    provider = DummyProvider([
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCallRequest(
+                    id="hb_1",
+                    name="heartbeat",
+                    arguments={"action": "run", "tasks": "do thing"},
+                )
+            ],
+        ),
+    ])
+
+    reasons: list[str] = []
+
+    async def _on_shutdown(reason: str) -> None:
+        reasons.append(reason)
+
+    async def _on_execute(tasks: str) -> str:
+        return f"done: {tasks}"
+
+    async def _eval_notify(*a, **kw):
+        return False
+
+    monkeypatch.setattr("nanobot.utils.evaluator.evaluate_response", _eval_notify)
+
+    service = HeartbeatService(
+        workspace=tmp_path,
+        provider=provider,
+        model="openai/gpt-4o-mini",
+        on_execute=_on_execute,
+        auto_shutdown=True,
+        on_shutdown=_on_shutdown,
+    )
+
+    await service._tick()
+    assert reasons
+    assert "run completed" in reasons[0]

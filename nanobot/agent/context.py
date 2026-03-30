@@ -16,13 +16,42 @@ from nanobot.utils.helpers import build_assistant_message, detect_image_mime
 class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
-    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
+    # Template defaults; copied per-instance into self.bootstrap_files.
+    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "REQUIREMENTS.md", "TASKS.md"]
+    ROLE_PRESET_MAP = {
+        "programmer": "AGENTS.programmer.md",
+        "researcher": "AGENTS.researcher.md",
+        "business_analyst": "AGENTS.business_analyst.md",
+        "consultant": "AGENTS.consultant.md",
+    }
+    ROLE_EXTRA_FILES = {
+        "programmer": [
+            "PROGRAMMER.WORKFLOWS.md",
+            "PROGRAMMER.BYPRODUCTS.md",
+        ],
+        "researcher": [
+            "RESEARCHER.WORKFLOWS.md",
+            "RESEARCHER.BYPRODUCTS.md",
+        ],
+        "business_analyst": [
+            "BA.WORKFLOWS.md",
+            "BA.BYPRODUCTS.md",
+        ],
+        "consultant": [
+            "CONSULTANT.WORKFLOWS.md",
+            "CONSULTANT.BYPRODUCTS.md",
+        ],
+    }
+    ROLE_PRESET_ALIASES = {
+        "business analyst": "business_analyst",
+    }
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
     def __init__(self, workspace: Path):
         self.workspace = workspace
         self.memory = MemoryStore(workspace)
         self.skills = SkillsLoader(workspace)
+        self.bootstrap_files = list(type(self).BOOTSTRAP_FILES)
 
     def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
@@ -109,13 +138,35 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         """Load all bootstrap files from workspace."""
         parts = []
 
-        for filename in self.BOOTSTRAP_FILES:
+        for filename in self.bootstrap_files:
             file_path = self.workspace / filename
             if file_path.exists():
                 content = file_path.read_text(encoding="utf-8")
                 parts.append(f"## {filename}\n\n{content}")
 
         return "\n\n".join(parts) if parts else ""
+
+    def apply_role_preset(self, role: str | None) -> None:
+        """Apply optional role preset by prepending a role-specific AGENTS file."""
+        if not role:
+            return
+        key = str(role).strip().lower()
+        key = self.ROLE_PRESET_ALIASES.get(key, key)
+        preset = self.ROLE_PRESET_MAP.get(key)
+        if not preset:
+            return
+        role_files = [preset, *self.ROLE_EXTRA_FILES.get(key, [])]
+        new_bootstrap: list[str] = []
+        seen: set[str] = set()
+        for rf in role_files:
+            if rf not in seen:
+                new_bootstrap.append(rf)
+                seen.add(rf)
+        for existing in self.bootstrap_files:
+            if existing not in seen:
+                new_bootstrap.append(existing)
+                seen.add(existing)
+        self.bootstrap_files = new_bootstrap
 
     def build_messages(
         self,

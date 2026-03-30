@@ -59,6 +59,8 @@ class HeartbeatService:
         on_notify: Callable[[str], Coroutine[Any, Any, None]] | None = None,
         interval_s: int = 30 * 60,
         enabled: bool = True,
+        auto_shutdown: bool = False,
+        on_shutdown: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     ):
         self.workspace = workspace
         self.provider = provider
@@ -67,8 +69,11 @@ class HeartbeatService:
         self.on_notify = on_notify
         self.interval_s = interval_s
         self.enabled = enabled
+        self.auto_shutdown = auto_shutdown
+        self.on_shutdown = on_shutdown
         self._running = False
         self._task: asyncio.Task | None = None
+        self._shutdown_requested = False
 
     @property
     def heartbeat_file(self) -> Path:
@@ -147,6 +152,7 @@ class HeartbeatService:
         content = self._read_heartbeat_file()
         if not content:
             logger.debug("Heartbeat: HEARTBEAT.md missing or empty")
+            await self._maybe_shutdown("Heartbeat file missing or empty")
             return
 
         logger.info("Heartbeat: checking for tasks...")
@@ -156,6 +162,7 @@ class HeartbeatService:
 
             if action != "run":
                 logger.info("Heartbeat: OK (nothing to report)")
+                await self._maybe_shutdown("Heartbeat reported no active tasks")
                 return
 
             logger.info("Heartbeat: tasks found, executing...")
@@ -171,8 +178,22 @@ class HeartbeatService:
                         await self.on_notify(response)
                     else:
                         logger.info("Heartbeat: silenced by post-run evaluation")
+                # After a run, optionally stop the service so it doesn't loop again.
+                await self._maybe_shutdown("Heartbeat run completed")
         except Exception:
             logger.exception("Heartbeat execution failed")
+
+    async def _maybe_shutdown(self, reason: str) -> None:
+        """Trigger auto-shutdown once when enabled."""
+        if not self.auto_shutdown or self._shutdown_requested:
+            return
+        self._shutdown_requested = True
+        logger.info("Heartbeat: auto-shutdown requested ({})", reason)
+        if self.on_shutdown:
+            try:
+                await self.on_shutdown(reason)
+            except Exception:
+                logger.exception("Heartbeat auto-shutdown callback failed")
 
     async def trigger_now(self) -> str | None:
         """Manually trigger a heartbeat."""

@@ -28,6 +28,7 @@ class DiscordConfig(Base):
     enabled: bool = False
     token: str = ""
     allow_from: list[str] = Field(default_factory=list)
+    allow_channel_ids: list[str] = Field(default_factory=list)
     gateway_url: str = "wss://gateway.discord.gg/?v=10&encoding=json"
     intents: int = 37377
     group_policy: Literal["mention", "open"] = "mention"
@@ -297,6 +298,9 @@ class DiscordChannel(BaseChannel):
         guild_id = payload.get("guild_id")
 
         if not sender_id or not channel_id:
+            return
+
+        if self.config.allow_channel_ids and channel_id not in self.config.allow_channel_ids:
             return
 
         if not self.is_allowed(sender_id):
